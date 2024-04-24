@@ -3,6 +3,8 @@ package simulator
 import (
 	"fmt"
 	"maps"
+	"strings"
+	"sync"
 )
 
 // TODO more sophisticated results
@@ -10,161 +12,99 @@ import (
 //	type SimulationResult struct {
 //		DropResult map[WeaponDrop]int
 //	}
-type SimulationResult map[WeaponSkin]int
+type SimulationResult struct {
+	weaponSkinTotals map[WeaponSkin]int
+}
 
-func (self *SimulationResult) merge(other *SimulationResult) {
+func NewSimulationResult() *SimulationResult {
+	return &SimulationResult{
+		weaponSkinTotals: make(map[WeaponSkin]int),
+	}
+}
+
+func (sr *SimulationResult) merge(other *SimulationResult) {
 	// left join sum
-	for wd := range *self {
-		if _, ok := (*other)[wd]; ok {
-			(*self)[wd] += (*other)[wd]
+	for wd := range sr.weaponSkinTotals {
+		if _, ok := other.weaponSkinTotals[wd]; ok {
+			sr.weaponSkinTotals[wd] += other.weaponSkinTotals[wd]
 		}
 	}
 
-	// pick up missing right side - won't overwrite so will carry through any extra
-	maps.Copy(*self, *other)
+	// pick up missing right side - doesn't overwrite, so it will carry through any extra on right side
+	maps.Copy(sr.weaponSkinTotals, other.weaponSkinTotals)
+}
+
+func (sr *SimulationResult) processWeaponDrop(wd *WeaponDrop) {
+	sr.weaponSkinTotals[wd.WeaponSkin]++
+}
+
+func (sr SimulationResult) String() string {
+	var sb strings.Builder
+	rarityCount := make(map[Rarity]int)
+	totalCount := 0
+
+	sb.WriteString("Total Drops:\n")
+	for wd, count := range sr.weaponSkinTotals {
+		rarityCount[wd.Rarity] += count
+		totalCount += count
+		sb.WriteString(fmt.Sprintf("\t[%v] %v times\n", wd, count))
+	}
+
+	fmt.Println("Rarity:")
+	for rarity, count := range rarityCount {
+		rarityChance := float32(count) / float32(totalCount)
+		sb.WriteString(fmt.Sprintf("[%v] %v times (%v%%)\n", rarity, count, rarityChance*100))
+	}
+
+	return sb.String()
 }
 
 // these are global but instantiated multiple times unfortunately
 var chances = make(map[Rarity]float32)
 var cumulative_chances = make(map[Rarity]float32)
 
-func SimulateMany(count int) {
-	if count <= 0 {
+func Simulate(batchCount int, batchSize int) {
+	if batchCount <= 0 {
 		return
 	}
 
-	result := make(SimulationResult)
-	for i := 0; i < count; i++ {
-		drop := kilowattCase.Open()
-		result[drop.WeaponSkin]++
-		//fmt.Println(drop)
+	var wg sync.WaitGroup
+	wg.Add(batchCount)
+
+	// definitely shouldn't use a channel this big, but...
+	resultChannel := make(chan *SimulationResult, batchCount)
+
+	for i := 0; i < batchCount; i++ {
+		go simulate(batchSize, &wg, resultChannel)
 	}
-	printResults(&result)
+
+	wg.Wait()
+	close(resultChannel)
+
+	// merge all reuslts into the main result
+	mainResult := <-resultChannel
+	for otherResult := range resultChannel {
+		mainResult.merge(otherResult)
+	}
+
+	fmt.Println("FINAL RESULT")
+	fmt.Println(fmt.Sprintf("Total Cases Opened: %v", batchCount*batchSize))
+	fmt.Println(mainResult)
 }
 
-// func SimulateMany(count int) {
-// 	if count <= 0 {
-// 		return
-// 	}
+func simulate(batchSize int, wg *sync.WaitGroup, resultChannel chan *SimulationResult) {
+	defer wg.Done()
 
-// 	// how to initialize this outside this function
-// 	chances[Blue] = 0.7992
-// 	chances[Purple] = 0.1598
-// 	chances[Pink] = 0.0320
-// 	chances[Red] = 0.0064
-// 	chances[Gold] = 0.0026
-
-// 	// how to do this idiomatically
-// 	cumulative_chances[Blue] = chances[Blue]
-// 	cumulative_chances[Purple] = cumulative_chances[Blue] + chances[Purple]
-// 	cumulative_chances[Pink] = cumulative_chances[Purple] + chances[Pink]
-// 	cumulative_chances[Red] = cumulative_chances[Pink] + chances[Red]
-// 	cumulative_chances[Gold] = cumulative_chances[Red] + chances[Gold]
-
-// 	var wg sync.WaitGroup
-// 	wg.Add(count)
-
-// 	// definitely shouldn't use a channel this big, but...
-// 	resultChannel := make(chan SimulationResult, count)
-
-// 	for i := 0; i < count; i++ {
-// 		go Simulate(&wg, resultChannel)
-// 	}
-
-// 	wg.Wait()
-// 	close(resultChannel)
-
-// 	// merge all reuslts into the main result
-// 	mainResult := <-resultChannel
-// 	for otherResult := range resultChannel {
-// 		mainResult.merge(&otherResult)
-// 	}
-
-// 	fmt.Println("FINAL RESULT")
-// 	printResults(&mainResult)
-
-// 	return
-// }
-
-// func Simulate(wg *sync.WaitGroup, resultChannel chan SimulationResult) SimulationResult {
-// 	if wg != nil {
-// 		defer wg.Done()
-// 	} else {
-// 		// assuming if wg is nil that not called from SimulateMany - weak assumption but easy
-// 		// how to initialize this outside this function
-// 		chances[Blue] = 0.7992
-// 		chances[Purple] = 0.1598
-// 		chances[Pink] = 0.0320
-// 		chances[Red] = 0.0064
-// 		chances[Gold] = 0.0026
-
-// 		// how to do this idiomatically
-// 		cumulative_chances[Blue] = chances[Blue]
-// 		cumulative_chances[Purple] = cumulative_chances[Blue] + chances[Purple]
-// 		cumulative_chances[Pink] = cumulative_chances[Purple] + chances[Pink]
-// 		cumulative_chances[Red] = cumulative_chances[Pink] + chances[Red]
-// 		cumulative_chances[Gold] = cumulative_chances[Red] + chances[Gold]
-// 	}
-
-// 	var dropResults = make(SimulationResult)
-
-// 	var num_drops = 100_000_000
-
-// 	fmt.Println(fmt.Sprintf("Simulating %v drops", num_drops))
-
-// 	for i := 0; i < num_drops; i++ {
-// 		var drop = simulate()
-// 		//fmt.Println(drop)
-// 		dropResults[drop]++
-// 	}
-
-// 	if resultChannel != nil {
-// 		resultChannel <- dropResults
-// 	}
-
-// 	//printResults(dropResults)
-
-// 	return dropResults
-// }
-
-// func simulate() WeaponDrop {
-
-// 	var drop WeaponDrop
-
-// 	if random := rand.Float32(); random <= cumulative_chances[Blue] {
-// 		drop.Rarity = Blue
-// 	} else if random <= cumulative_chances[Purple] {
-// 		drop.Rarity = Purple
-// 	} else if random <= cumulative_chances[Pink] {
-// 		drop.Rarity = Pink
-// 	} else if random <= cumulative_chances[Red] {
-// 		drop.Rarity = Red
-// 	} else if random <= cumulative_chances[Gold] {
-// 		drop.Rarity = Gold
-// 	}
-
-// 	// TODO pick something
-// 	// CaseDrop interface
-// 	drop.Name = "no name"
-// 	drop.Quality = FactoryNew
-
-// 	return drop
-// }
-
-func printResults(results *SimulationResult) {
-	var rarityCount = make(map[Rarity]int)
-	totalCount := 0
-
-	fmt.Println("Drops:")
-	for wd, count := range *results {
-		rarityCount[wd.Rarity] += count
-		totalCount += count
-		fmt.Println(fmt.Sprintf("\t[%v] %v times", wd, count))
+	if batchSize <= 0 {
+		return
 	}
 
-	fmt.Println("Rarity:")
-	for rarity, count := range rarityCount {
-		rarityChance := float32(count) / float32(totalCount)
-		fmt.Println(fmt.Sprintf("[%v] %v times (%v%%)", rarity, count, rarityChance*100))
+	result := NewSimulationResult()
+	for i := 0; i < batchSize; i++ {
+		wd := kilowattCase.Open()
+		result.processWeaponDrop(wd)
 	}
+
+	resultChannel <- result
+	fmt.Println(result)
 }

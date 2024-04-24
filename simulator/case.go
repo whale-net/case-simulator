@@ -47,12 +47,12 @@ func (ws WeaponSkin) String() string {
 type Case struct {
 	Name string
 	// TODO make list and add helper functions
-	SkinPool map[Rarity][]WeaponSkin
+	RaritySkinMap map[Rarity][]WeaponSkin
 }
 
-func (c Case) Open() WeaponDrop {
+func (c Case) Open() *WeaponDrop {
 	rarity := Rarity(sampleNormal(CumulativeRarityDistribution))
-	possibleSkins := c.SkinPool[rarity]
+	possibleSkins := c.RaritySkinMap[rarity]
 
 	skinIndex := rand.Intn(len(possibleSkins))
 	skinDrop := possibleSkins[skinIndex]
@@ -60,7 +60,7 @@ func (c Case) Open() WeaponDrop {
 	rawFloat := rand.Float32()
 	scaledFloat := skinDrop.MinFloat + (skinDrop.MaxFloat-skinDrop.MinFloat)*rawFloat
 
-	return WeaponDrop{
+	return &WeaponDrop{
 		WeaponSkin: skinDrop,
 		Float:      scaledFloat,
 	}
@@ -73,7 +73,7 @@ func (c Case) Open() WeaponDrop {
 // TODO helper function to create
 var kilowattCase Case = Case{
 	Name: "Kilowatt",
-	SkinPool: map[Rarity][]WeaponSkin{
+	RaritySkinMap: map[Rarity][]WeaponSkin{
 		// TODO Fill out Knives properly
 		Gold: {
 			{

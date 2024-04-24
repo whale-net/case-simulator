@@ -6,5 +6,5 @@ import (
 
 func main() {
 	//simulator.Simulate(nil, nil)
-	simulator.SimulateMany(100_000)
+	simulator.Simulate(10, 100_000_000)
 }
