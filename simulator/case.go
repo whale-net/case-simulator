@@ -1,58 +1,19 @@
 package simulator
 
 import (
-	"fmt"
 	"math/rand"
 )
 
-// Instance of WeaponSkin
-type WeaponDrop struct {
-	WeaponSkin WeaponSkin
-	Float      float32
-}
-
-func (wd WeaponDrop) GetQuality() Quality {
-	// technically wrong order for speed, if it were to even matter
-	if wd.Float <= 0.07 {
-		return FactoryNew
-	} else if wd.Float <= 0.15 {
-		return MinimalWear
-	} else if wd.Float <= 0.38 {
-		return FieldTested
-	} else if wd.Float <= 0.45 {
-		return WellWorn
-	}
-	return BattleScarred
-}
-
-func (wd WeaponDrop) String() string {
-	return fmt.Sprintf("%v - %v (%v)", wd.WeaponSkin, wd.GetQuality(), wd.Float)
-}
-
-type WeaponSkin struct {
-	Weapon Weapon
-	Skin   Skin
-	Rarity Rarity
-
-	MinFloat float32
-	MaxFloat float32
-}
-
-func (ws WeaponSkin) String() string {
-	return fmt.Sprintf("%v %v (%v)", ws.Weapon, ws.Skin, ws.Rarity)
-}
-
-// TODO - GetQualities
-
-type Case struct {
+type WeaponCase struct {
 	Name string
-	// TODO make list and add helper functions
-	RaritySkinMap map[Rarity][]WeaponSkin
+
+	WeaponSkins []WeaponSkin
+	RarityMap   map[Rarity][]WeaponSkin
 }
 
-func (c Case) Open() *WeaponDrop {
+func (c WeaponCase) Open() WeaponDrop {
 	rarity := Rarity(sampleNormal(CumulativeRarityDistribution))
-	possibleSkins := c.RaritySkinMap[rarity]
+	possibleSkins := c.RarityMap[rarity]
 
 	skinIndex := rand.Intn(len(possibleSkins))
 	skinDrop := possibleSkins[skinIndex]
@@ -60,10 +21,22 @@ func (c Case) Open() *WeaponDrop {
 	rawFloat := rand.Float32()
 	scaledFloat := skinDrop.MinFloat + (skinDrop.MaxFloat-skinDrop.MinFloat)*rawFloat
 
-	return &WeaponDrop{
+	return WeaponDrop{
 		WeaponSkin: skinDrop,
 		Float:      scaledFloat,
+		IsStatTrak: rand.Float32() < 0.10,
 	}
+}
+
+func NewCase(wsList []WeaponSkin) WeaponCase {
+	// initialze with new but return by value
+	var wc WeaponCase
+	wc.RarityMap = make(map[Rarity][]WeaponSkin)
+	wc.WeaponSkins = wsList
+	for i := 0; i < len(wc.WeaponSkins); i++ {
+		wc.RarityMap[wc.WeaponSkins[i].Rarity] = append(wc.RarityMap[wc.WeaponSkins[i].Rarity], wc.WeaponSkins[i])
+	}
+	return wc
 }
 
 ///////////
@@ -71,61 +44,136 @@ func (c Case) Open() *WeaponDrop {
 ///////////
 
 // TODO helper function to create
-var kilowattCase Case = Case{
-	Name: "Kilowatt",
-	RaritySkinMap: map[Rarity][]WeaponSkin{
-		// TODO Fill out Knives properly
-		Gold: {
-			{
-				Weapon:   Knife,
-				Skin:     MadeUpValue,
-				Rarity:   Gold,
-				MinFloat: 0.0,
-				MaxFloat: 1.0,
-			},
-		},
-		Red: {
-			{
-				Weapon:   AK47,
-				Skin:     Inheritance,
-				Rarity:   Red,
-				MinFloat: 0.0,
-				MaxFloat: 0.80,
-			},
-			{
-				Weapon:   AWP,
-				Skin:     ChromeCannon,
-				Rarity:   Red,
-				MinFloat: 0.0,
-				MaxFloat: 1.0,
-			},
-		},
-		Pink: {
-			{
-				Weapon:   M4A1S,
-				Skin:     BlackLotus,
-				Rarity:   Pink,
-				MinFloat: 0.0,
-				MaxFloat: 0.70,
-			},
-		},
-		Purple: {
-			{
-				Weapon:   Glock18,
-				Skin:     Block18,
-				Rarity:   Purple,
-				MinFloat: 0.0,
-				MaxFloat: 0.67,
-			},
-		},
-		Blue: {
-			{
-				Weapon:   MAC10,
-				Skin:     LightBox,
-				Rarity:   Blue,
-				MinFloat: 0.0,
-				MaxFloat: 1.0,
-			},
-		},
+var kilowattCase WeaponCase = NewCase([]WeaponSkin{
+	// knife
+	{
+		Weapon:   Knife,
+		Skin:     MadeUpValue,
+		Rarity:   Gold,
+		MinFloat: 0.0,
+		MaxFloat: 1.0,
 	},
-}
+	// red
+	{
+		Weapon:   AK47,
+		Skin:     Inheritance,
+		Rarity:   Red,
+		MinFloat: 0.0,
+		MaxFloat: 0.80,
+	},
+	{
+		Weapon:   AWP,
+		Skin:     ChromeCannon,
+		Rarity:   Red,
+		MinFloat: 0.0,
+		MaxFloat: 1.0,
+	},
+	// pink
+	{
+		Weapon:   M4A1S,
+		Skin:     BlackLotus,
+		Rarity:   Pink,
+		MinFloat: 0.0,
+		MaxFloat: 0.70,
+	},
+	{
+		Weapon:   Zeusx27,
+		Skin:     Olympus,
+		Rarity:   Pink,
+		MinFloat: 0.0,
+		MaxFloat: 0.67,
+	},
+	{
+		Weapon:   USPS,
+		Skin:     Jawbreaker,
+		Rarity:   Pink,
+		MinFloat: 0.0,
+		MaxFloat: 1.0,
+	},
+	// purple
+	{
+		Weapon:   Glock18,
+		Skin:     Block18,
+		Rarity:   Purple,
+		MinFloat: 0.0,
+		MaxFloat: 0.67,
+	},
+	{
+		Weapon:   M4A4,
+		Skin:     EtchLord,
+		Rarity:   Purple,
+		MinFloat: 0.0,
+		MaxFloat: 1.0,
+	},
+	{
+		Weapon:   FiveSeven,
+		Skin:     Hybrid,
+		Rarity:   Purple,
+		MinFloat: 0.0,
+		MaxFloat: 1.0,
+	},
+	{
+		Weapon:   MP7,
+		Skin:     JustSmile,
+		Rarity:   Purple,
+		MinFloat: 0.0,
+		MaxFloat: 1.00,
+	},
+	{
+		Weapon:   SawedOff,
+		Skin:     AnalogInput,
+		Rarity:   Purple,
+		MinFloat: 0.0,
+		MaxFloat: 0.62,
+	},
+	// blue
+	{
+		Weapon:   MAC10,
+		Skin:     LightBox,
+		Rarity:   Blue,
+		MinFloat: 0.0,
+		MaxFloat: 1.0,
+	},
+	{
+		Weapon:   SSG08,
+		Skin:     Dezastre,
+		Rarity:   Blue,
+		MinFloat: 0.0,
+		MaxFloat: 1.0,
+	},
+	{
+		Weapon:   XM1014,
+		Skin:     Irezumi,
+		Rarity:   Blue,
+		MinFloat: 0.0,
+		MaxFloat: 0.80,
+	},
+	{
+		Weapon:   UMP45,
+		Skin:     Motorized,
+		Rarity:   Blue,
+		MinFloat: 0.0,
+		MaxFloat: 0.80,
+	},
+	{
+		Weapon:   Tec9,
+		Skin:     Slag,
+		Rarity:   Blue,
+		MinFloat: 0.0,
+		MaxFloat: 0.90,
+	},
+	{
+		Weapon:   DualBerettas,
+		Skin:     Hideout,
+		Rarity:   Blue,
+		MinFloat: 0.0,
+		MaxFloat: 0.7,
+	},
+	{
+		Weapon:   Nova,
+		Skin:     DarkSigil,
+		Rarity:   Blue,
+		MinFloat: 0.0,
+		MaxFloat: 0.7,
+	},
+})

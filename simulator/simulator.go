@@ -102,7 +102,7 @@ func simulate(batchSize int, wg *sync.WaitGroup, resultChannel chan *SimulationR
 	result := NewSimulationResult()
 	for i := 0; i < batchSize; i++ {
 		wd := kilowattCase.Open()
-		result.processWeaponDrop(wd)
+		result.processWeaponDrop(&wd)
 	}
 
 	resultChannel <- result
